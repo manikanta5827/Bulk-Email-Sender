@@ -1,0 +1,21 @@
+{
+  "name": "bulk-email-sender",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "bun run index.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/nodemailer": "^8.0.1"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "hono": "^4.12.26",
+    "nodemailer": "^9.0.1",
+    "xlsx": "^0.18.5"
+  }
+}

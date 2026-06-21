@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bulk Email Sender</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --primary: #4F46E5;
+  --primary-hover: #4338CA;
+  --primary-light: #EEF2FF;
+  --primary-border: #C7D2FE;
+  --success: #059669;
+  --success-light: #ECFDF5;
+  --success-border: #A7F3D0;
+  --danger: #DC2626;
+  --danger-light: #FEF2F2;
+  --danger-border: #FECACA;
+  --warning: #D97706;
+  --warning-light: #FFFBEB;
+  --bg: #F1F5F9;
+  --card-bg: #FFFFFF;
+  --text: #1E293B;
+  --text-secondary: #64748B;
+  --text-muted: #94A3B8;
+  --border: #E2E8F0;
+  --border-light: #F1F5F9;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow: 0 1px 3px 0 rgba(0,0,0,0.08), 0 1px 2px -1px rgba(0,0,0,0.08);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -2px rgba(0,0,0,0.05);
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --mono: 'SF Mono', 'Fira Code', 'Fira Mono', 'Roboto Mono', monospace;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+header {
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+header .logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--text);
+}
+header .logo .icon {
+  width: 36px; height: 36px;
+  background: var(--primary);
+  color: white;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+header .status-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--success);
+  display: inline-block;
+  margin-right: 6px;
+}
+header .status-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 20px 60px;
+}
+
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 24px;
+  margin-bottom: 20px;
+}
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border-light);
+}
+.card-header .step {
+  width: 28px; height: 28px;
+  background: var(--primary-light);
+  color: var(--primary);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.card-header h2 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.upload-zone {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 40px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: var(--bg);
+}
+.upload-zone:hover, .upload-zone.dragover {
+  border-color: var(--primary);
+  background: var(--primary-light);
+}
+.upload-zone .upload-icon {
+  font-size: 36px;
+  margin-bottom: 10px;
+  display: block;
+  color: var(--text-muted);
+}
+.upload-zone p {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+.upload-zone p strong {
+  color: var(--primary);
+  cursor: pointer;
+}
+.upload-zone input[type="file"] { display: none; }
+
+.preview-section { margin-top: 18px; display: none; }
+.preview-section.visible { display: block; }
+.preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.preview-header span {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.table-wrap {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  max-height: 260px;
+  overflow-y: auto;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+table th {
+  background: var(--bg);
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  position: sticky;
+  top: 0;
+  border-bottom: 1px solid var(--border);
+}
+table td {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border-light);
+  color: var(--text);
+}
+table tr:last-child td { border-bottom: none; }
+table .row-num {
+  color: var(--text-muted);
+  font-size: 11px;
+  width: 40px;
+}
+
+.form-group { margin-bottom: 14px; }
+.form-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 5px;
+}
+.form-group input, .form-group textarea, .form-group select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-family: var(--font);
+  color: var(--text);
+  background: var(--card-bg);
+  transition: border-color 0.2s;
+  outline: none;
+}
+.form-group input:focus, .form-group textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+.form-group textarea {
+  font-family: var(--mono);
+  min-height: 180px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.placeholder-chips {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  background: var(--primary-light);
+  color: var(--primary);
+  border: 1px solid var(--primary-border);
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: var(--mono);
+  user-select: none;
+}
+.chip:hover {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+.chip .plus { font-size: 14px; line-height: 1; }
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.toggle-row span {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+.toggle {
+  position: relative;
+  width: 44px; height: 24px;
+  background: var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.toggle.active { background: var(--success); }
+.toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 20px; height: 20px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+.toggle.active::after { transform: translateX(20px); }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: var(--font);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn-primary {
+  background: var(--primary);
+  color: white;
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+.btn-secondary {
+  background: var(--card-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.btn-secondary:hover:not(:disabled) {
+  background: var(--bg);
+}
+.btn-send {
+  padding: 14px 32px;
+  font-size: 16px;
+  background: linear-gradient(135deg, #4F46E5, #7C3AED);
+  color: white;
+  width: 100%;
+  justify-content: center;
+  border-radius: var(--radius);
+}
+.btn-send:hover:not(:disabled) {
+  box-shadow: 0 4px 12px rgba(79,70,229,0.4);
+}
+.btn-send.sending {
+  background: var(--text-muted);
+  cursor: wait;
+}
+
+.progress-section { display: none; }
+.progress-section.visible { display: block; }
+
+.progress-bar-wrap {
+  background: var(--border-light);
+  border-radius: 8px;
+  height: 10px;
+  overflow: hidden;
+  margin-bottom: 18px;
+}
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4F46E5, #7C3AED);
+  border-radius: 8px;
+  transition: width 0.3s ease;
+  width: 0%;
+}
+
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.stat-card {
+  padding: 16px;
+  border-radius: var(--radius-sm);
+  text-align: center;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+}
+.stat-card .stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.stat-card .stat-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 4px;
+}
+.stat-sent { border-color: var(--success-border); background: var(--success-light); }
+.stat-sent .stat-value { color: var(--success); }
+.stat-sent .stat-label { color: var(--success); }
+.stat-failed { border-color: var(--danger-border); background: var(--danger-light); }
+.stat-failed .stat-value { color: var(--danger); }
+.stat-failed .stat-label { color: var(--danger); }
+.stat-total { border-color: var(--primary-border); background: var(--primary-light); }
+.stat-total .stat-value { color: var(--primary); }
+.stat-total .stat-label { color: var(--primary); }
+
+.log-wrap {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  max-height: 300px;
+  overflow-y: auto;
+}
+.log-table { font-size: 12px; }
+.log-table td { padding: 6px 14px; }
+.log-table .status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 11px;
+}
+.status-sent { background: var(--success-light); color: var(--success); }
+.status-failed { background: var(--danger-light); color: var(--danger); }
+.status-sending { background: var(--warning-light); color: var(--warning); }
+
+.spinner {
+  display: inline-block;
+  width: 18px; height: 18px;
+  border: 2px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.toast {
+  position: fixed;
+  bottom: 24px; right: 24px;
+  padding: 12px 20px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 500;
+  z-index: 100;
+  animation: slideUp 0.3s ease;
+  max-width: 400px;
+}
+.toast-error { background: var(--danger); color: white; }
+.toast-success { background: var(--success); color: white; }
+@keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+.log-empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 20px;
+  font-size: 13px;
+}
+
+@media (max-width: 640px) {
+  .form-row { grid-template-columns: 1fr; }
+  .stats-row { grid-template-columns: 1fr; }
+  .container { padding: 16px 12px 40px; }
+  .card { padding: 16px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="icon">&#9993;</div>
+    <span>Bulk Email Sender</span>
+  </div>
+  <div>
+    <span class="status-dot" id="connDot"></span>
+    <span class="status-text" id="connText">Ready</span>
+  </div>
+</header>
+
+<main class="container">
+
+  <!-- Step 1: Import -->
+  <div class="card" id="importCard">
+    <div class="card-header">
+      <div class="step">1</div>
+      <h2>Import Recipients</h2>
+    </div>
+    <div class="upload-zone" id="uploadZone">
+      <span class="upload-icon">&#128196;</span>
+      <p>Drag &amp; drop your Excel or CSV file here, or <strong>click to browse</strong></p>
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+    </div>
+    <div class="preview-section" id="previewSection">
+      <div class="preview-header">
+        <span id="previewCount">0 recipients loaded</span>
+        <button class="btn btn-secondary" id="clearImportBtn" style="padding:6px 14px;font-size:12px;">Clear</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Company Name</th><th>Email</th></tr></thead>
+          <tbody id="previewBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 2: Template -->
+  <div class="card">
+    <div class="card-header">
+      <div class="step">2</div>
+      <h2>Email Template</h2>
+    </div>
+    <div class="placeholder-chips">
+      <span style="font-size:13px;color:var(--text-muted);margin-right:4px;line-height:1.8;">Insert:</span>
+      <span class="chip" data-placeholder="{{company_name}}"><span class="plus">+</span> Company Name</span>
+      <span class="chip" data-placeholder="{{email}}"><span class="plus">+</span> Email</span>
+    </div>
+    <div class="form-group">
+      <label for="subject">Subject Line</label>
+      <input type="text" id="subject" placeholder="e.g. Special offer for {{company_name}}" autocomplete="off">
+    </div>
+    <div class="form-group">
+      <label for="htmlBody">HTML Body</label>
+      <textarea id="htmlBody" placeholder="<p>Hello {{company_name}},</p>
+<p>We're reaching out to {{email}}...</p>"></textarea>
+    </div>
+  </div>
+
+  <!-- Step 3: SMTP -->
+  <div class="card">
+    <div class="card-header">
+      <div class="step">3</div>
+      <h2>SMTP Configuration (Zoho / any provider)</h2>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="smtpHost">SMTP Host</label>
+        <input type="text" id="smtpHost" placeholder="smtp.zoho.com" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label for="smtpPort">Port</label>
+        <input type="number" id="smtpPort" placeholder="587" autocomplete="off">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="smtpUser">Username / Email</label>
+        <input type="email" id="smtpUser" placeholder="you@yourdomain.com" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label for="smtpPass">Password / App Password</label>
+        <input type="password" id="smtpPass" placeholder="Your SMTP password" autocomplete="off">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="smtpFrom">Sender Email (From)</label>
+        <input type="email" id="smtpFrom" placeholder="noreply@yourdomain.com" autocomplete="off">
+      </div>
+    </div>
+    <div class="toggle-row" style="margin-top:4px;">
+      <span>Use SSL (Secure)</span>
+      <div class="toggle" id="smtpSecureToggle"></div>
+      <span style="font-size:12px;color:var(--text-muted);">Enable for port 465, disable for 587</span>
+    </div>
+  </div>
+
+  <!-- Step 4: Send -->
+  <div class="card" id="sendCard">
+    <div class="card-header">
+      <div class="step">4</div>
+      <h2>Send Emails</h2>
+    </div>
+    <button class="btn btn-send" id="sendBtn" disabled>
+      <span>SEND EMAILS</span>
+    </button>
+    <p style="font-size:12px;color:var(--text-muted);margin-top:10px;text-align:center;" id="sendHint">
+      Import recipients and configure SMTP to enable sending.
+    </p>
+
+    <div class="progress-section" id="progressSection">
+      <div class="progress-bar-wrap">
+        <div class="progress-bar-fill" id="progressBar"></div>
+      </div>
+      <div class="stats-row">
+        <div class="stat-card stat-sent">
+          <div class="stat-value" id="statSent">0</div>
+          <div class="stat-label">Sent</div>
+        </div>
+        <div class="stat-card stat-failed">
+          <div class="stat-value" id="statFailed">0</div>
+          <div class="stat-label">Failed</div>
+        </div>
+        <div class="stat-card stat-total">
+          <div class="stat-value" id="statTotal">0</div>
+          <div class="stat-label">Total</div>
+        </div>
+      </div>
+      <div class="log-wrap">
+        <table class="log-table">
+          <thead><tr><th>#</th><th>Email</th><th>Company</th><th>Status</th></tr></thead>
+          <tbody id="logBody">
+            <tr><td colspan="4" class="log-empty">Waiting to start sending...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+(() => {
+
+const LS_SMTP = 'bes_smtp_config';
+const LS_TEMPLATE = 'bes_template';
+
+let recipients = [];
+let sending = false;
+
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => document.querySelectorAll(s);
+
+const uploadZone = $('#uploadZone');
+const fileInput = $('#fileInput');
+const previewSection = $('#previewSection');
+const previewCount = $('#previewCount');
+const previewBody = $('#previewBody');
+const clearImportBtn = $('#clearImportBtn');
+const subjectEl = $('#subject');
+const htmlBodyEl = $('#htmlBody');
+const smtpHostEl = $('#smtpHost');
+const smtpPortEl = $('#smtpPort');
+const smtpUserEl = $('#smtpUser');
+const smtpPassEl = $('#smtpPass');
+const smtpFromEl = $('#smtpFrom');
+const smtpSecureToggle = $('#smtpSecureToggle');
+const sendBtn = $('#sendBtn');
+const sendHint = $('#sendHint');
+const progressSection = $('#progressSection');
+const progressBar = $('#progressBar');
+const statSent = $('#statSent');
+const statFailed = $('#statFailed');
+const statTotal = $('#statTotal');
+const logBody = $('#logBody');
+const connDot = $('#connDot');
+const connText = $('#connText');
+
+let smtpSecure = false;
+
+function loadSMTP() {
+  try {
+    const raw = localStorage.getItem(LS_SMTP);
+    if (raw) {
+      const d = JSON.parse(raw);
+      smtpHostEl.value = d.host || 'smtp.zoho.com';
+      smtpPortEl.value = d.port || '587';
+      smtpUserEl.value = d.user || '';
+      smtpPassEl.value = d.pass || '';
+      smtpFromEl.value = d.from || d.user || '';
+      smtpSecure = d.secure === true;
+      updateSecureToggle();
+    } else {
+      smtpHostEl.value = 'smtp.zoho.com';
+      smtpPortEl.value = '587';
+    }
+  } catch (_) {}
+}
+function saveSMTP() {
+  localStorage.setItem(LS_SMTP, JSON.stringify({
+    host: smtpHostEl.value,
+    port: smtpPortEl.value,
+    user: smtpUserEl.value,
+    pass: smtpPassEl.value,
+    from: smtpFromEl.value,
+    secure: smtpSecure,
+  }));
+}
+
+function loadTemplate() {
+  try {
+    const raw = localStorage.getItem(LS_TEMPLATE);
+    if (raw) {
+      const d = JSON.parse(raw);
+      subjectEl.value = d.subject || '';
+      htmlBodyEl.value = d.html || '';
+    }
+  } catch (_) {}
+}
+function saveTemplate() {
+  localStorage.setItem(LS_TEMPLATE, JSON.stringify({
+    subject: subjectEl.value,
+    html: htmlBodyEl.value,
+  }));
+}
+
+function updateSecureToggle() {
+  if (smtpSecure) smtpSecureToggle.classList.add('active');
+  else smtpSecureToggle.classList.remove('active');
+}
+
+function getSMTPConfig() {
+  return {
+    host: smtpHostEl.value.trim(),
+    port: parseInt(smtpPortEl.value, 10) || 587,
+    user: smtpUserEl.value.trim(),
+    pass: smtpPassEl.value,
+    from: smtpFromEl.value.trim(),
+    secure: smtpSecure,
+  };
+}
+
+function getTemplate() {
+  return {
+    subject: subjectEl.value,
+    html: htmlBodyEl.value,
+  };
+}
+
+function canSend() {
+  const smtp = getSMTPConfig();
+  return recipients.length > 0 && smtp.host && smtp.user && smtp.pass;
+}
+
+function updateSendButton() {
+  const ok = canSend() && !sending;
+  sendBtn.disabled = !ok;
+  if (sending) {
+    sendBtn.innerHTML = '<span class="spinner"></span> SENDING...';
+    sendBtn.classList.add('sending');
+    sendHint.textContent = 'Sending in progress...';
+  } else if (recipients.length === 0) {
+    sendBtn.innerHTML = '<span>SEND EMAILS</span>';
+    sendBtn.classList.remove('sending');
+    sendHint.textContent = 'Import recipients and configure SMTP to enable sending.';
+  } else if (!ok) {
+    sendBtn.innerHTML = '<span>SEND EMAILS</span>';
+    sendBtn.classList.remove('sending');
+    sendHint.textContent = 'Please fill in all SMTP fields to enable sending.';
+  } else {
+    sendBtn.innerHTML = '<span>SEND EMAILS</span>';
+    sendBtn.classList.remove('sending');
+    sendHint.textContent = recipients.length + ' recipient' + (recipients.length > 1 ? 's' : '') + ' ready. Click to send.';
+  }
+}
+
+function renderPreview() {
+  if (recipients.length === 0) {
+    previewSection.classList.remove('visible');
+    return;
+  }
+  previewSection.classList.add('visible');
+  previewCount.textContent = recipients.length + ' recipient' + (recipients.length > 1 ? 's' : '') + ' loaded';
+  previewBody.innerHTML = recipients.map((r, i) =>
+    '<tr><td class="row-num">' + (i + 1) + '</td><td>' + esc(r.company_name) + '</td><td>' + esc(r.email) + '</td></tr>'
+  ).join('');
+}
+
+function esc(s) {
+  if (!s) return '';
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function uploadFile(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const resp = await fetch('/api/upload', { method: 'POST', body: formData });
+  const json = await resp.json();
+
+  if (!resp.ok || json.error) {
+    showToast(json.error || 'Upload failed', 'error');
+    return;
+  }
+
+  recipients = json.recipients || [];
+  renderPreview();
+  updateSendButton();
+  showToast(recipients.length + ' recipients imported', 'success');
+}
+
+function clearRecipients() {
+  recipients = [];
+  renderPreview();
+  updateSendButton();
+  fileInput.value = '';
+  resetProgress();
+}
+
+function resetProgress() {
+  progressSection.classList.remove('visible');
+  progressBar.style.width = '0%';
+  statSent.textContent = '0';
+  statFailed.textContent = '0';
+  statTotal.textContent = '0';
+  logBody.innerHTML = '<tr><td colspan="4" class="log-empty">Waiting to start sending...</td></tr>';
+}
+
+function addLogEntry(idx, email, company, status, errorMsg) {
+  if (idx === 1) logBody.innerHTML = '';
+  const statusClass = status === 'sent' ? 'status-sent' : 'status-failed';
+  const statusText = status === 'sent' ? 'Sent' : 'Failed';
+  const title = errorMsg ? ' title="' + esc(errorMsg) + '"' : '';
+  const tr = document.createElement('tr');
+  tr.innerHTML = '<td class="row-num">' + idx + '</td><td>' + esc(email) + '</td><td>' + esc(company) + '</td><td><span class="status-badge ' + statusClass + '"' + title + '>' + statusText + '</span></td>';
+  logBody.appendChild(tr);
+  logBody.parentElement.scrollTop = logBody.parentElement.scrollHeight;
+}
+
+async function handleSend() {
+  if (sending) return;
+  sending = true;
+  updateSendButton();
+  resetProgress();
+  progressSection.classList.add('visible');
+  progressBar.style.width = '0%';
+
+  const smtp = getSMTPConfig();
+  const template = getTemplate();
+
+  const payload = {
+    smtp,
+    subject: template.subject,
+    html: template.html,
+    recipients: recipients.map(r => ({ company_name: r.company_name, email: r.email })),
+  };
+
+  statTotal.textContent = recipients.length;
+
+  try {
+    const resp = await fetch('/api/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ error: 'Request failed with status ' + resp.status }));
+      throw new Error(err.error || 'Send request failed');
+    }
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop() || '';
+
+      for (const part of parts) {
+        const trimmed = part.trim();
+        if (!trimmed.startsWith('data: ')) continue;
+        try {
+          const event = JSON.parse(trimmed.slice(6));
+          handleSSEEvent(event);
+        } catch (_) {}
+      }
+    }
+
+    if (buffer.trim().startsWith('data: ')) {
+      try {
+        const event = JSON.parse(buffer.trim().slice(6));
+        handleSSEEvent(event);
+      } catch (_) {}
+    }
+
+  } catch (err) {
+    showToast(err.message || 'Send failed', 'error');
+  } finally {
+    sending = false;
+    updateSendButton();
+  }
+}
+
+function handleSSEEvent(event) {
+  switch (event.event) {
+    case 'progress':
+      statSent.textContent = event.sent;
+      statFailed.textContent = event.failed;
+      statTotal.textContent = event.total;
+      const pct = event.total > 0 ? Math.round(((event.sent + event.failed) / event.total) * 100) : 0;
+      progressBar.style.width = pct + '%';
+      if (event.status === 'sent' || event.status === 'failed') {
+        addLogEntry(event.sent + event.failed, event.current || event.email, event.company || '', event.status, event.error);
+      }
+      break;
+    case 'error':
+      if (event.email) {
+        statFailed.textContent = event.failed;
+        progressBar.style.width = Math.round(((event.sent + event.failed) / event.total) * 100) + '%';
+        addLogEntry(event.sent + event.failed, event.email, event.company || '', 'failed', event.error);
+      } else {
+        showToast(event.error || 'SMTP error', 'error');
+      }
+      break;
+    case 'complete':
+      statSent.textContent = event.sent;
+      statFailed.textContent = event.failed;
+      progressBar.style.width = '100%';
+      showToast('Completed: ' + event.sent + ' sent, ' + event.failed + ' failed', event.failed > 0 ? 'error' : 'success');
+      connDot.style.background = 'var(--success)';
+      connText.textContent = 'Complete';
+      break;
+  }
+}
+
+function showToast(msg, type) {
+  const existing = $('.toast');
+  if (existing) existing.remove();
+  const t = document.createElement('div');
+  t.className = 'toast toast-' + type;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => { if (t.parentNode) t.remove(); }, 4000);
+}
+
+function insertPlaceholder(placeholder) {
+  const el = document.activeElement;
+  if (el === htmlBodyEl || el === subjectEl) {
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const val = el.value;
+    el.value = val.substring(0, start) + placeholder + val.substring(end);
+    el.selectionStart = el.selectionEnd = start + placeholder.length;
+    el.focus();
+    saveTemplate();
+  } else {
+    htmlBodyEl.focus();
+    htmlBodyEl.value += placeholder;
+    saveTemplate();
+  }
+}
+
+uploadZone.addEventListener('click', () => fileInput.click());
+uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+uploadZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  uploadZone.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) uploadFile(file);
+});
+fileInput.addEventListener('change', () => {
+  const file = fileInput.files[0];
+  if (file) uploadFile(file);
+});
+
+clearImportBtn.addEventListener('click', clearRecipients);
+
+$$('.chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    insertPlaceholder(chip.dataset.placeholder);
+  });
+});
+
+smtpSecureToggle.addEventListener('click', () => {
+  smtpSecure = !smtpSecure;
+  updateSecureToggle();
+  saveSMTP();
+});
+
+[subjectEl, htmlBodyEl].forEach(el => {
+  el.addEventListener('input', () => {
+    saveTemplate();
+  });
+});
+
+[smtpHostEl, smtpPortEl, smtpUserEl, smtpPassEl, smtpFromEl].forEach(el => {
+  el.addEventListener('input', () => {
+    saveSMTP();
+    updateSendButton();
+  });
+});
+
+sendBtn.addEventListener('click', handleSend);
+
+loadSMTP();
+loadTemplate();
+updateSendButton();
+
+})();
+</script>
+
+</body>
+</html>
