@@ -7,15 +7,14 @@
     "start": "bun run index.ts"
   },
   "devDependencies": {
-    "@types/bun": "latest",
-    "@types/nodemailer": "^8.0.1"
+    "@types/bun": "latest"
   },
   "peerDependencies": {
     "typescript": "^5"
   },
   "dependencies": {
     "hono": "^4.12.26",
-    "nodemailer": "^9.0.1",
+    "resend": "^4.1.2",
     "xlsx": "^0.18.5"
   }
 }

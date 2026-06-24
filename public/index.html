@@ -524,42 +524,16 @@ table .row-num {
     </div>
   </div>
 
-  <!-- Step 3: SMTP -->
+  <!-- Step 3: Resend -->
   <div class="card">
     <div class="card-header">
       <div class="step">3</div>
-      <h2>SMTP Configuration (Zoho / any provider)</h2>
+      <h2>Resend Configuration</h2>
     </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label for="smtpHost">SMTP Host</label>
-        <input type="text" id="smtpHost" placeholder="smtp.zoho.com" autocomplete="off">
-      </div>
-      <div class="form-group">
-        <label for="smtpPort">Port</label>
-        <input type="number" id="smtpPort" placeholder="587" autocomplete="off">
-      </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label for="smtpUser">Username / Email</label>
-        <input type="email" id="smtpUser" placeholder="you@yourdomain.com" autocomplete="off">
-      </div>
-      <div class="form-group">
-        <label for="smtpPass">Password / App Password</label>
-        <input type="password" id="smtpPass" placeholder="Your SMTP password" autocomplete="off">
-      </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label for="smtpFrom">Sender Email (From)</label>
-        <input type="email" id="smtpFrom" placeholder="noreply@yourdomain.com" autocomplete="off">
-      </div>
-    </div>
-    <div class="toggle-row" style="margin-top:4px;">
-      <span>Use SSL (Secure)</span>
-      <div class="toggle" id="smtpSecureToggle"></div>
-      <span style="font-size:12px;color:var(--text-muted);">Enable for port 465, disable for 587</span>
+    <div class="form-group">
+      <label for="resendFrom">Sender Email (From)</label>
+      <input type="email" id="resendFrom" placeholder="you@yourdomain.com" autocomplete="off">
+      <p style="font-size:12px;color:var(--text-muted);margin-top:4px;">Must be from a verified domain in Resend</p>
     </div>
   </div>
 
@@ -573,7 +547,7 @@ table .row-num {
       <span>SEND EMAILS</span>
     </button>
     <p style="font-size:12px;color:var(--text-muted);margin-top:10px;text-align:center;" id="sendHint">
-      Import recipients and configure SMTP to enable sending.
+      Import recipients and configure Resend to enable sending. Free tier limit: 100 emails/day.
     </p>
 
     <div class="progress-section" id="progressSection">
@@ -610,7 +584,7 @@ table .row-num {
 <script>
 (() => {
 
-const LS_SMTP = 'bes_smtp_config';
+const LS_RESEND = 'bes_resend_config';
 const LS_TEMPLATE = 'bes_template';
 
 let recipients = [];
@@ -627,12 +601,7 @@ const previewBody = $('#previewBody');
 const clearImportBtn = $('#clearImportBtn');
 const subjectEl = $('#subject');
 const htmlBodyEl = $('#htmlBody');
-const smtpHostEl = $('#smtpHost');
-const smtpPortEl = $('#smtpPort');
-const smtpUserEl = $('#smtpUser');
-const smtpPassEl = $('#smtpPass');
-const smtpFromEl = $('#smtpFrom');
-const smtpSecureToggle = $('#smtpSecureToggle');
+const resendFromEl = $('#resendFrom');
 const sendBtn = $('#sendBtn');
 const sendHint = $('#sendHint');
 const progressSection = $('#progressSection');
@@ -644,34 +613,18 @@ const logBody = $('#logBody');
 const connDot = $('#connDot');
 const connText = $('#connText');
 
-let smtpSecure = false;
-
-function loadSMTP() {
+function loadResendConfig() {
   try {
-    const raw = localStorage.getItem(LS_SMTP);
+    const raw = localStorage.getItem(LS_RESEND);
     if (raw) {
       const d = JSON.parse(raw);
-      smtpHostEl.value = d.host || 'smtp.zoho.com';
-      smtpPortEl.value = d.port || '587';
-      smtpUserEl.value = d.user || '';
-      smtpPassEl.value = d.pass || '';
-      smtpFromEl.value = d.from || d.user || '';
-      smtpSecure = d.secure === true;
-      updateSecureToggle();
-    } else {
-      smtpHostEl.value = 'smtp.zoho.com';
-      smtpPortEl.value = '587';
+      resendFromEl.value = d.from || '';
     }
   } catch (_) {}
 }
-function saveSMTP() {
-  localStorage.setItem(LS_SMTP, JSON.stringify({
-    host: smtpHostEl.value,
-    port: smtpPortEl.value,
-    user: smtpUserEl.value,
-    pass: smtpPassEl.value,
-    from: smtpFromEl.value,
-    secure: smtpSecure,
+function saveResendConfig() {
+  localStorage.setItem(LS_RESEND, JSON.stringify({
+    from: resendFromEl.value,
   }));
 }
 
@@ -692,19 +645,9 @@ function saveTemplate() {
   }));
 }
 
-function updateSecureToggle() {
-  if (smtpSecure) smtpSecureToggle.classList.add('active');
-  else smtpSecureToggle.classList.remove('active');
-}
-
-function getSMTPConfig() {
+function getResendConfig() {
   return {
-    host: smtpHostEl.value.trim(),
-    port: parseInt(smtpPortEl.value, 10) || 587,
-    user: smtpUserEl.value.trim(),
-    pass: smtpPassEl.value,
-    from: smtpFromEl.value.trim(),
-    secure: smtpSecure,
+    from: resendFromEl.value.trim(),
   };
 }
 
@@ -716,8 +659,8 @@ function getTemplate() {
 }
 
 function canSend() {
-  const smtp = getSMTPConfig();
-  return recipients.length > 0 && smtp.host && smtp.user && smtp.pass;
+  const config = getResendConfig();
+  return recipients.length > 0 && config.from;
 }
 
 function updateSendButton() {
@@ -730,15 +673,19 @@ function updateSendButton() {
   } else if (recipients.length === 0) {
     sendBtn.innerHTML = '<span>SEND EMAILS</span>';
     sendBtn.classList.remove('sending');
-    sendHint.textContent = 'Import recipients and configure SMTP to enable sending.';
+    sendHint.textContent = 'Import recipients and configure Resend to enable sending. Free tier limit: 100 emails/day.';
+  } else if (recipients.length > 100) {
+    sendBtn.innerHTML = '<span>SEND EMAILS</span>';
+    sendBtn.classList.remove('sending');
+    sendHint.textContent = 'Too many recipients. Free tier limit is 100 emails/day. You have ' + recipients.length + '.';
   } else if (!ok) {
     sendBtn.innerHTML = '<span>SEND EMAILS</span>';
     sendBtn.classList.remove('sending');
-    sendHint.textContent = 'Please fill in all SMTP fields to enable sending.';
+    sendHint.textContent = 'Please fill in your sender email.';
   } else {
     sendBtn.innerHTML = '<span>SEND EMAILS</span>';
     sendBtn.classList.remove('sending');
-    sendHint.textContent = recipients.length + ' recipient' + (recipients.length > 1 ? 's' : '') + ' ready. Click to send.';
+    sendHint.textContent = recipients.length + ' recipient' + (recipients.length > 1 ? 's' : '') + ' ready. Free tier limit: 100/day.';
   }
 }
 
@@ -774,7 +721,11 @@ async function uploadFile(file) {
   recipients = json.recipients || [];
   renderPreview();
   updateSendButton();
-  showToast(recipients.length + ' recipients imported', 'success');
+  if (json.message) {
+    showToast(json.message, 'error');
+  } else {
+    showToast(recipients.length + ' recipients imported', 'success');
+  }
 }
 
 function clearRecipients() {
@@ -813,11 +764,11 @@ async function handleSend() {
   progressSection.classList.add('visible');
   progressBar.style.width = '0%';
 
-  const smtp = getSMTPConfig();
+  const config = getResendConfig();
   const template = getTemplate();
 
   const payload = {
-    smtp,
+    from: config.from,
     subject: template.subject,
     html: template.html,
     recipients: recipients.map(r => ({ company_name: r.company_name, email: r.email })),
@@ -892,7 +843,7 @@ function handleSSEEvent(event) {
         progressBar.style.width = Math.round(((event.sent + event.failed) / event.total) * 100) + '%';
         addLogEntry(event.sent + event.failed, event.email, event.company || '', 'failed', event.error);
       } else {
-        showToast(event.error || 'SMTP error', 'error');
+        showToast(event.error || 'Resend error', 'error');
       }
       break;
     case 'complete':
@@ -955,28 +906,20 @@ $$('.chip').forEach(chip => {
   });
 });
 
-smtpSecureToggle.addEventListener('click', () => {
-  smtpSecure = !smtpSecure;
-  updateSecureToggle();
-  saveSMTP();
-});
-
 [subjectEl, htmlBodyEl].forEach(el => {
   el.addEventListener('input', () => {
     saveTemplate();
   });
 });
 
-[smtpHostEl, smtpPortEl, smtpUserEl, smtpPassEl, smtpFromEl].forEach(el => {
-  el.addEventListener('input', () => {
-    saveSMTP();
-    updateSendButton();
-  });
+resendFromEl.addEventListener('input', () => {
+  saveResendConfig();
+  updateSendButton();
 });
 
 sendBtn.addEventListener('click', handleSend);
 
-loadSMTP();
+loadResendConfig();
 loadTemplate();
 updateSendButton();
 

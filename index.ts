@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import * as XLSX from "xlsx";
-import * as nodemailer from "nodemailer";
+import { Resend } from "resend";
 
 const app = new Hono();
 
@@ -115,12 +115,19 @@ app.post("/api/upload", async (c) => {
       return c.json({ error: "No valid email addresses found" }, 400);
     }
 
+    const capped = recipients.length > 100;
+    const result = capped ? recipients.slice(0, 100) : recipients;
+
     return c.json({
-      recipients,
+      recipients: result,
       headers,
       companyCol,
       emailCol,
-      total: recipients.length,
+      total: result.length,
+      capped,
+      message: capped
+        ? "Free tier limit: 100 emails/day. Only the first 100 recipients will be used."
+        : undefined,
     });
   } catch (err) {
     return c.json(
@@ -132,7 +139,7 @@ app.post("/api/upload", async (c) => {
 
 app.post("/api/send", async (c) => {
   let body: {
-    smtp: { host: string; port: number; user: string; pass: string; from?: string; secure: boolean };
+    from: string;
     subject: string;
     html: string;
     recipients: { company_name: string; email: string }[];
@@ -144,13 +151,20 @@ app.post("/api/send", async (c) => {
     return c.json({ error: "Invalid JSON body" }, 400);
   }
 
-  const { smtp, subject, html, recipients } = body;
+  const { from, subject, html, recipients } = body;
 
-  if (!smtp?.host || !smtp?.user || !smtp?.pass) {
-    return c.json({ error: "SMTP host, user, and password are required" }, 400);
+  const resendApiKey = process.env.RESEND_API_KEY;
+  if (!resendApiKey) {
+    return c.json({ error: "RESEND_API_KEY environment variable is not set" }, 500);
+  }
+  if (!from) {
+    return c.json({ error: "Sender email (from) is required" }, 400);
   }
   if (!recipients?.length) {
     return c.json({ error: "No recipients provided" }, 400);
+  }
+  if (recipients.length > 100) {
+    return c.json({ error: "Free tier limit: maximum 100 emails per day. You have " + recipients.length + " recipients." }, 400);
   }
 
   const encoder = new TextEncoder();
@@ -163,30 +177,7 @@ app.post("/api/send", async (c) => {
         );
       };
 
-      const transporter = nodemailer.createTransport({
-        host: smtp.host,
-        port: smtp.port || 587,
-        secure: smtp.secure === true,
-        auth: {
-          user: smtp.user,
-          pass: smtp.pass,
-        },
-        connectionTimeout: 15000,
-        greetingTimeout: 10000,
-        socketTimeout: 15000,
-      });
-
-      try {
-        await transporter.verify();
-      } catch (err) {
-        enqueue({
-          event: "error",
-          error: "SMTP connection failed: " + (err as Error).message,
-        });
-        transporter.close();
-        controller.close();
-        return;
-      }
+      const resend = new Resend(resendApiKey);
 
       let sent = 0;
       let failed = 0;
@@ -194,49 +185,71 @@ app.post("/api/send", async (c) => {
 
       enqueue({ event: "start", total });
 
-      for (const recipient of recipients) {
+      const BATCH_SIZE = 4;
+      const BATCH_DELAY_MS = 1000;
+
+      for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
         if (controller.desiredSize === null) {
-          transporter.close();
           return;
         }
 
-        const emailSubject = replacePlaceholders(subject, recipient);
-        const emailHtml = replacePlaceholders(html, recipient);
+        const batch = recipients.slice(i, i + BATCH_SIZE);
 
-        try {
-          await transporter.sendMail({
-            from: smtp.from || smtp.user,
-            to: recipient.email,
-            subject: emailSubject,
-            html: emailHtml,
-          });
+        const results = await Promise.allSettled(
+          batch.map(async (recipient) => {
+            const emailSubject = replacePlaceholders(subject, recipient);
+            const emailHtml = replacePlaceholders(html, recipient);
 
-          sent++;
-          enqueue({
-            event: "progress",
-            sent,
-            failed,
-            total,
-            current: recipient.email,
-            company: recipient.company_name,
-            status: "sent",
-          });
-        } catch (err) {
-          failed++;
-          enqueue({
-            event: "error",
-            sent,
-            failed,
-            total,
-            email: recipient.email,
-            company: recipient.company_name,
-            error: (err as Error).message,
-            status: "failed",
-          });
+            const { error } = await resend.emails.send({
+              from,
+              to: [recipient.email],
+              subject: emailSubject,
+              html: emailHtml,
+            });
+
+            if (error) {
+              throw new Error(error.message);
+            }
+
+            return recipient;
+          })
+        );
+
+        for (let j = 0; j < results.length; j++) {
+          const result = results[j]!;
+          const recipient = batch[j]!;
+
+          if (result.status === "fulfilled") {
+            sent++;
+            enqueue({
+              event: "progress",
+              sent,
+              failed,
+              total,
+              current: recipient.email,
+              company: recipient.company_name,
+              status: "sent",
+            });
+          } else {
+            failed++;
+            enqueue({
+              event: "error",
+              sent,
+              failed,
+              total,
+              email: recipient.email,
+              company: recipient.company_name,
+              error: (result as PromiseRejectedResult).reason?.message ?? "Unknown error",
+              status: "failed",
+            });
+          }
+        }
+
+        if (i + BATCH_SIZE < recipients.length) {
+          await new Promise((r) => setTimeout(r, BATCH_DELAY_MS));
         }
       }
 
-      transporter.close();
       enqueue({ event: "complete", sent, failed, total });
       controller.close();
     },
